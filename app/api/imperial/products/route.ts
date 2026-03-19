@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
+import { rewriteImperialProductImages } from '@/lib/imperial-storage-url';
 
 const pool = process.env.DATABASE_URL_IMPERIAL
   ? new Pool({ connectionString: process.env.DATABASE_URL_IMPERIAL })
@@ -31,7 +32,9 @@ export async function GET() {
         created_at: r.created_at,
         updated_at: r.updated_at,
         price: r.price,
-        image_urls: r.image_urls ?? r.images ?? r.image ?? null,
+        image_urls: rewriteImperialProductImages(
+          r.image_urls ?? r.images ?? r.image ?? null
+        ),
       }))
     );
   } catch (e) {

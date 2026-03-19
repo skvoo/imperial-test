@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
+import { rewriteImperialMediaUrl } from '@/lib/imperial-storage-url';
 
 const pool = process.env.DATABASE_URL_IMPERIAL
   ? new Pool({ connectionString: process.env.DATABASE_URL_IMPERIAL })
@@ -24,7 +25,9 @@ export async function GET() {
     return NextResponse.json(
       rows.map((r: Record<string, unknown>) => ({
         id: r.id,
-        image: r.image ?? r.image_url ?? r.images,
+        image: rewriteImperialMediaUrl(
+          (r.image ?? r.image_url ?? r.images) as string | null
+        ),
         start_date: r.start_date ?? r.date ?? r.event_date ?? r.start_at ?? null,
         end_date: r.end_date ?? r.end_at ?? null,
         created_at: r.created_at,
