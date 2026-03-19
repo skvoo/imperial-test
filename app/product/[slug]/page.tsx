@@ -113,21 +113,23 @@ export default async function ProductPage({
   return (
     <main style={styles.main}>
       <nav style={styles.breadcrumb}>
-        <Link href="/">Home</Link>
+        <Link href="/" style={styles.breadcrumbLink}>Home</Link>
         <span style={styles.breadcrumbSep}> / </span>
-        <Link href="/shop">Shop</Link>
+        <Link href="/shop" style={styles.breadcrumbLink}>Shop</Link>
         <span style={styles.breadcrumbSep}> / </span>
-        <span style={styles.muted}>{product.name}</span>
+        <span style={styles.breadcrumbCurrent}>{product.name}</span>
       </nav>
 
       <article style={styles.article}>
         <div style={styles.gallery}>
-          {mainImage && (
+          {mainImage ? (
             <img
               src={mainImage}
               alt={product.name}
               style={styles.mainImage}
             />
+          ) : (
+            <div style={styles.mainImagePlaceholder}>No image</div>
           )}
           {images.length > 1 && (
             <div style={styles.thumbnails}>
@@ -192,22 +194,31 @@ export default async function ProductPage({
       )}
 
       <footer style={styles.footer}>
-        <Link href="/shop">← Back to Shop</Link>
-        {' · '}
-        <Link href="/test-imperial">Test Imperial (DB + MinIO)</Link>
+        <Link href="/shop" style={styles.footerLink}>← Back to Shop</Link>
+        <span style={styles.footerMuted}> · </span>
+        <Link href="/" style={styles.footerLink}>Home</Link>
       </footer>
     </main>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  main: { maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' },
+  main: {
+    minHeight: '100vh',
+    maxWidth: 1100,
+    margin: '0 auto',
+    padding: '1.5rem 1rem',
+    background: '#fafaf8',
+    color: '#1a1a1a',
+  },
   breadcrumb: { marginBottom: '1.5rem', fontSize: '0.9rem' },
-  breadcrumbSep: { color: 'var(--muted)' },
-  muted: { color: 'var(--muted)', fontSize: '0.9rem' },
+  breadcrumbLink: { color: '#6b5b4f', textDecoration: 'none' },
+  breadcrumbSep: { color: '#9a9086' },
+  breadcrumbCurrent: { color: '#1a1a1a' },
+  muted: { color: '#6b5b4f', fontSize: '0.9rem' },
   article: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
     gap: '2rem',
     marginBottom: '3rem',
   },
@@ -217,70 +228,107 @@ const styles: Record<string, React.CSSProperties> = {
     aspectRatio: '1',
     objectFit: 'cover',
     borderRadius: 8,
-    background: 'var(--surface)',
+    background: '#ebe8e4',
+    border: '1px solid #e5e0d8',
+  },
+  mainImagePlaceholder: {
+    width: '100%',
+    aspectRatio: '1',
+    borderRadius: 8,
+    background: '#ebe8e4',
+    border: '1px solid #e5e0d8',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.9rem',
+    color: '#9a9086',
   },
   thumbnails: {
     display: 'flex',
     gap: '0.5rem',
     marginTop: '0.5rem',
+    flexWrap: 'wrap',
   },
   thumb: {
     width: 72,
     height: 72,
     objectFit: 'cover',
     borderRadius: 6,
-    background: 'var(--surface)',
+    background: '#ebe8e4',
+    border: '1px solid #e5e0d8',
   },
   details: {},
-  title: { fontSize: '1.75rem', marginTop: 0, marginBottom: '0.5rem' },
-  price: { fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' },
+  title: {
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontSize: '1.75rem',
+    fontWeight: 400,
+    marginTop: 0,
+    marginBottom: '0.5rem',
+    color: '#1a1a1a',
+  },
+  price: {
+    fontSize: '1.25rem',
+    fontWeight: 600,
+    marginBottom: '1rem',
+    color: '#6b5b4f',
+  },
   description: {
     fontSize: '0.95rem',
     lineHeight: 1.6,
     marginBottom: '1rem',
+    color: '#2a2a2a',
   },
   actions: { display: 'flex', gap: '0.75rem', flexWrap: 'wrap' },
   button: {
     padding: '0.75rem 1.5rem',
-    background: 'var(--accent)',
-    color: '#fff',
-    border: 'none',
+    background: '#e8e4df',
+    color: '#1a1a1a',
+    border: '1px solid #b8a99a',
     borderRadius: 8,
     fontSize: '1rem',
     cursor: 'pointer',
   },
   buttonSecondary: {
     padding: '0.75rem 1.5rem',
-    background: 'transparent',
-    color: 'var(--text)',
-    border: '1px solid var(--border)',
+    background: '#fff',
+    color: '#1a1a1a',
+    border: '1px solid #d4cfc7',
     borderRadius: 8,
     fontSize: '1rem',
     cursor: 'pointer',
   },
   section: { marginTop: '2rem' },
-  h2: { fontSize: '1.25rem', marginBottom: '1rem' },
+  h2: {
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontSize: '1.35rem',
+    fontWeight: 400,
+    marginBottom: '1rem',
+    color: '#1a1a1a',
+  },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-    gap: '1rem',
+    gap: '1.25rem',
   },
   card: {
     textDecoration: 'none',
     color: 'inherit',
-    border: '1px solid var(--border)',
+    border: '1px solid #e5e0d8',
     borderRadius: 8,
     overflow: 'hidden',
     display: 'block',
+    background: '#fff',
   },
   cardImage: {
     width: '100%',
     aspectRatio: '1',
     objectFit: 'cover',
-    background: 'var(--surface)',
+    background: '#ebe8e4',
   },
   cardBody: { padding: '0.75rem', fontSize: '0.9rem' },
-  cardTitle: { display: 'block', marginBottom: '0.25rem' },
-  cardPrice: { color: 'var(--muted)' },
-  footer: { marginTop: '2rem', fontSize: '0.9rem', color: 'var(--muted)' },
+  cardTitle: { display: 'block', marginBottom: '0.25rem', color: '#1a1a1a' },
+  cardPrice: { color: '#6b5b4f', fontWeight: 500 },
+  footer: { marginTop: '2rem', fontSize: '0.9rem' },
+  footerLink: { color: '#6b5b4f', textDecoration: 'none' },
+  footerMuted: { color: '#9a9086' },
 };
