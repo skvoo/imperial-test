@@ -6,7 +6,10 @@ export default function Home() {
         Тест подключения к imperialdb и отображения файлов из MinIO.
       </p>
       <p style={{ marginTop: '1.5rem' }}>
-        <a href="/test-imperial">Открыть тест → /test-imperial</a>
+        <a href="/shop">Shop (пример страниц товаров как imperialmiami.com) → /shop</a>
+      </p>
+      <p style={{ marginTop: '0.5rem' }}>
+        <a href="/test-imperial">Тест БД + MinIO → /test-imperial</a>
       </p>
     </main>
   );
