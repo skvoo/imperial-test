@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 
 const STORAGE_BASE =
   (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_IMPERIAL_STORAGE_BASE) ||
@@ -29,6 +30,11 @@ type NewsItem = {
   image: string | null;
   created_at: string;
 };
+type NewsFull = NewsItem & {
+  content_en?: string | null;
+  content_ru?: string | null;
+  excerpt_ru?: string | null;
+};
 type ProductItem = {
   id: string;
   slug: string;
@@ -53,6 +59,31 @@ export default function TestImperialPage() {
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [openNewsSlug, setOpenNewsSlug] = useState<string | null>(null);
+  const [openNewsData, setOpenNewsData] = useState<NewsFull | null>(null);
+  const [openNewsLoading, setOpenNewsLoading] = useState(false);
+
+  const fetchNewsBySlug = useCallback(async (slug: string) => {
+    setOpenNewsLoading(true);
+    setOpenNewsData(null);
+    try {
+      const res = await fetch(`/api/imperial/news/${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setOpenNewsData(data);
+      } else {
+        setOpenNewsData(null);
+      }
+    } catch {
+      setOpenNewsData(null);
+    } finally {
+      setOpenNewsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (openNewsSlug) fetchNewsBySlug(openNewsSlug);
+  }, [openNewsSlug, fetchNewsBySlug]);
 
   useEffect(() => {
     const base = '';
@@ -103,198 +134,462 @@ export default function TestImperialPage() {
     products?.filter((item) => productImageUrls(item.image_urls).length > 0) ?? [];
   const eventsWithImages = events?.filter((item) => item.image) ?? [];
 
+  const openNewsImageUrl = openNewsData?.image
+    ? (openNewsData.image.startsWith('http') ? openNewsData.image : imageUrl('imperial-news-images', openNewsData.image))
+    : null;
+
   if (loading) {
     return (
       <main style={styles.main}>
-        <div style={styles.card}>
-          <p style={styles.muted}>Загрузка… проверка подключения к imperialdb и MinIO.</p>
+        <div style={styles.hero}>
+          <h1 style={styles.heroTitle}>Imperial</h1>
+          <p style={styles.heroSub}>Loading… Checking connection to imperialdb and MinIO.</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main style={styles.main}>
-      <div style={styles.wrapper}>
-        <h1 style={styles.title}>Тест: Imperial → imperialdb + MinIO</h1>
-        <p style={styles.muted}>
-          API подключается по <code>DATABASE_URL_IMPERIAL</code>. Картинки отдаются с MinIO (https://db.sharconai.com/s3); старые ссылки Supabase переписываются в API на лету.
-        </p>
+    <>
+      <main style={styles.main}>
+        <header style={styles.header}>
+          <Link href="/" style={styles.logo}>Imperial</Link>
+          <nav style={styles.nav}>
+            <a href="#news" style={styles.navLink}>News</a>
+            <a href="#products" style={styles.navLink}>Shop</a>
+            <a href="#events" style={styles.navLink}>Events</a>
+          </nav>
+        </header>
 
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Подключение к БД</h2>
-          {stats?.ok ? (
-            <>
-              <p style={{ color: 'var(--success)' }}>
-                ✓ DATABASE_URL_IMPERIAL настроен. Это подключение к реальной БД:
-              </p>
-              {(stats.database || stats.host) && (
-                <p style={{ ...styles.muted, marginTop: '0.25rem' }}>
-                  База: <strong>{stats.database ?? '—'}</strong>
-                  {stats.host != null && stats.host !== '' && (
-                    <> · Хост: <strong>{stats.host}</strong></>
+        <section style={styles.hero}>
+          <h1 style={styles.heroTitle}>An expression of refined living.</h1>
+          <p style={styles.heroSub}>
+            Enduring forms in noble materials, where balance becomes language.
+          </p>
+          <p style={styles.heroMuted}>
+            imperialdb + MinIO · Database: <strong>{stats?.database ?? '—'}</strong>
+            {stats?.host ? <> · Host: <strong>{stats.host}</strong></> : null}
+          </p>
+        </section>
+
+        {!stats?.ok && (
+          <section style={styles.connectionBar}>
+            <span style={styles.connectionError}>
+              Connection error: {stats?.error ?? errors.global ?? 'DATABASE_URL_IMPERIAL not set'}
+            </span>
+          </section>
+        )}
+        {stats?.ok && stats?.counts && (
+          <section style={styles.connectionBar}>
+            <span style={styles.connectionLabel}>Tables:</span>
+            {Object.entries(stats.counts).map(([table, count]) => (
+              <span key={table} style={styles.connectionStat}>{table}: {count >= 0 ? count : '—'}</span>
+            ))}
+          </section>
+        )}
+
+        <section id="news" style={styles.section}>
+          <h2 style={styles.sectionTitle}>News</h2>
+          {errors.news && <p style={styles.errorText}>{errors.news}</p>}
+          {newsWithImages.length === 0 && !errors.news && (
+            <p style={styles.muted}>No news with images yet.</p>
+          )}
+          <div style={styles.newsGrid}>
+            {newsWithImages.slice(0, 12).map((item) => {
+              const src = imageUrl('imperial-news-images', item.image);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  style={styles.newsCard}
+                  onClick={() => setOpenNewsSlug(item.slug)}
+                >
+                  {src && (
+                    <img src={src} alt="" style={styles.newsThumb} referrerPolicy="no-referrer" />
                   )}
-                  {stats.database === 'imperialdb' && stats.host && (
-                    <> — для Pigsty ожидается хост 104.223.25.234</>
+                  <div style={styles.newsCardBody}>
+                    <span style={styles.newsCardTitle}>{item.title_ru || item.title_en}</span>
+                    <span style={styles.newsCardDate}>
+                      {new Date(item.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section id="products" style={styles.section}>
+          <h2 style={styles.sectionTitle}>Shop</h2>
+          {errors.products && <p style={styles.errorText}>{errors.products}</p>}
+          {productsWithImages.length === 0 && !errors.products && (
+            <p style={styles.muted}>No products with images yet.</p>
+          )}
+          <div style={styles.productGrid}>
+            {productsWithImages.slice(0, 8).map((item) => {
+              const urls = productImageUrls(item.image_urls);
+              const firstUrl = urls[0] ? imageUrl('imperial-product-images', urls[0]) : null;
+              return (
+                <Link
+                  key={item.id}
+                  href={`/product/${encodeURIComponent(item.slug)}`}
+                  style={styles.productCard}
+                >
+                  {firstUrl && (
+                    <img src={firstUrl} alt="" style={styles.productThumb} referrerPolicy="no-referrer" />
                   )}
-                </p>
-              )}
-              <p style={styles.muted}>Записей в таблицах:</p>
-            </>
-          ) : (
-            <p style={{ color: 'var(--error)' }}>
-              ✗ Ошибка: {stats?.error ?? errors.global ?? 'DATABASE_URL_IMPERIAL не задан в Vercel'}
-            </p>
-          )}
-          {stats?.counts && (
-            <ul style={styles.countList}>
-              {Object.entries(stats.counts).map(([table, count]) => (
-                <li key={table}>
-                  <strong>{table}</strong>: {count >= 0 ? count : '—'}
-                </li>
-              ))}
-            </ul>
-          )}
+                  <div style={styles.productCardBody}>
+                    <span style={styles.productCardName}>{item.name}</span>
+                    {item.price != null && (
+                      <span style={styles.productCardPrice}>${item.price}</span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+          <p style={styles.sectionLink}>
+            <Link href="/shop" style={styles.link}>View all</Link>
+          </p>
         </section>
 
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Новости (public.news)</h2>
-          {errors.news && <p style={{ color: 'var(--error)' }}>{errors.news}</p>}
-          <p style={styles.muted}>Показаны только записи с картинками (до 6).</p>
-          {newsWithImages.length === 0 && <p style={styles.muted}>Записей с картинками нет.</p>}
-          {newsWithImages.length > 0 && (
-            <div style={styles.grid}>
-              {newsWithImages.slice(0, 6).map((item) => {
-                const src = imageUrl('imperial-news-images', item.image);
-                return (
-                  <div key={item.id} style={styles.tile}>
-                    {src && (
-                      <img src={src} alt="" style={styles.thumb} referrerPolicy="no-referrer" />
-                    )}
-                    <div>
-                      <strong>{item.title_ru || item.title_en}</strong>
-                      <br />
-                      <small style={styles.muted}>
-                        {new Date(item.created_at).toLocaleString('ru')}
-                      </small>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        <section id="events" style={styles.section}>
+          <h2 style={styles.sectionTitle}>Events</h2>
+          {errors.events && <p style={styles.errorText}>{errors.events}</p>}
+          {eventsWithImages.length === 0 && !errors.events && (
+            <p style={styles.muted}>No events with images yet.</p>
           )}
-        </section>
-
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Продукты (public.products)</h2>
-          {errors.products && <p style={{ color: 'var(--error)' }}>{errors.products}</p>}
-          <p style={styles.muted}>Показаны только записи с картинками (до 6).</p>
-          {productsWithImages.length === 0 && <p style={styles.muted}>Записей с картинками нет.</p>}
-          {productsWithImages.length > 0 && (
-            <div style={styles.grid}>
-              {productsWithImages.slice(0, 6).map((item) => {
-                const urls = productImageUrls(item.image_urls);
-                const firstUrl = urls[0]
-                  ? imageUrl('imperial-product-images', urls[0])
-                  : null;
-                return (
-                  <div key={item.id} style={styles.tile}>
-                    {firstUrl && (
-                      <img src={firstUrl} alt="" style={styles.thumb} referrerPolicy="no-referrer" />
+          <div style={styles.eventGrid}>
+            {eventsWithImages.slice(0, 6).map((item) => {
+              const src = imageUrl('imperial-event-images', item.image);
+              return (
+                <div key={item.id} style={styles.eventCard}>
+                  {src && (
+                    <img src={src} alt="" style={styles.eventThumb} referrerPolicy="no-referrer" />
+                  )}
+                  <div style={styles.eventCardBody}>
+                    <span style={styles.eventCardTitle}>
+                      {item.title_ru || item.title_en || item.id}
+                    </span>
+                    {item.start_date && (
+                      <span style={styles.eventCardDate}>
+                        {new Date(item.start_date).toLocaleDateString('en-US')}
+                      </span>
                     )}
-                    <div>
-                      <strong>{item.name}</strong>
-                      {item.price != null && (
-                        <>
-                          <br />
-                          <small>{item.price}</small>
-                        </>
-                      )}
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section style={styles.card}>
-          <h2 style={styles.h2}>События (public.events)</h2>
-          {errors.events && <p style={{ color: 'var(--error)' }}>{errors.events}</p>}
-          <p style={styles.muted}>Показаны только записи с картинками (до 6).</p>
-          {eventsWithImages.length === 0 && <p style={styles.muted}>Записей с картинками нет.</p>}
-          {eventsWithImages.length > 0 && (
-            <div style={styles.grid}>
-              {eventsWithImages.slice(0, 6).map((item) => {
-                const src = imageUrl('imperial-event-images', item.image);
-                return (
-                  <div key={item.id} style={styles.tile}>
-                    {src && (
-                      <img src={src} alt="" style={styles.thumb} referrerPolicy="no-referrer" />
-                    )}
-                    <div>
-                      <strong>{item.title_ru || item.title_en || item.id}</strong>
-                      {item.start_date && (
-                        <>
-                          <br />
-                          <small style={styles.muted}>
-                            {new Date(item.start_date).toLocaleDateString('ru')}
-                          </small>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+              );
+            })}
+          </div>
         </section>
 
         <footer style={styles.footer}>
-          <a href="/">Главная</a>
-          {' · '}
-          Деплой: Vercel · БД: imperialdb · Картинки: MinIO (db.sharconai.com/s3)
+          <Link href="/" style={styles.footerLink}>Home</Link>
+          <span style={styles.footerMuted}> · Vercel · imperialdb · MinIO</span>
         </footer>
-      </div>
-    </main>
+      </main>
+
+      {openNewsSlug && (
+        <div
+          style={styles.modalOverlay}
+          onClick={() => { setOpenNewsSlug(null); setOpenNewsData(null); }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="News article"
+        >
+          <div
+            style={styles.modal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              style={styles.modalClose}
+              onClick={() => { setOpenNewsSlug(null); setOpenNewsData(null); }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            {openNewsLoading && (
+              <p style={styles.modalLoading}>Loading…</p>
+            )}
+            {!openNewsLoading && openNewsData && (
+              <>
+                {openNewsImageUrl && (
+                  <img
+                    src={openNewsImageUrl}
+                    alt=""
+                    style={styles.modalImage}
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <h3 style={styles.modalTitle}>
+                  {openNewsData.title_ru || openNewsData.title_en}
+                </h3>
+                <p style={styles.modalDate}>
+                  {new Date(openNewsData.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+                <div style={styles.modalContent}>
+                  {(openNewsData.content_ru || openNewsData.content_en)
+                    ? (openNewsData.content_ru || openNewsData.content_en || '')
+                    : (openNewsData.excerpt_ru || openNewsData.excerpt_en || '—')}
+                </div>
+              </>
+            )}
+            {!openNewsLoading && !openNewsData && (
+              <p style={styles.errorText}>Article not found.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   main: {
-    padding: '2rem 1rem',
-    maxWidth: 900,
+    minHeight: '100vh',
+    background: '#0a0a0a',
+    color: '#e8e4df',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '1.25rem 2rem',
+    maxWidth: 1200,
+    margin: '0 auto',
+    borderBottom: '1px solid rgba(201, 162, 39, 0.2)',
+  },
+  logo: {
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontSize: '1.5rem',
+    fontWeight: 400,
+    color: '#e8e4df',
+    textDecoration: 'none',
+    letterSpacing: '0.05em',
+  },
+  nav: { display: 'flex', gap: '1.5rem' },
+  navLink: {
+    color: 'rgba(232, 228, 223, 0.85)',
+    textDecoration: 'none',
+    fontSize: '0.9rem',
+    letterSpacing: '0.04em',
+  },
+  hero: {
+    padding: '4rem 2rem',
+    maxWidth: 1200,
+    margin: '0 auto',
+    textAlign: 'center',
+  },
+  heroTitle: {
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
+    fontWeight: 400,
+    color: '#e8e4df',
+    margin: '0 0 0.75rem',
+    letterSpacing: '0.02em',
+    lineHeight: 1.25,
+  },
+  heroSub: {
+    fontSize: '1rem',
+    color: 'rgba(232, 228, 223, 0.8)',
+    margin: 0,
+    maxWidth: 520,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+  },
+  heroMuted: {
+    marginTop: '1.5rem',
+    fontSize: '0.8rem',
+    color: 'rgba(201, 162, 39, 0.7)',
+  },
+  connectionBar: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.75rem 1.25rem',
+    padding: '0.6rem 2rem',
+    maxWidth: 1200,
+    margin: '0 auto',
+    background: 'rgba(201, 162, 39, 0.08)',
+    borderBottom: '1px solid rgba(201, 162, 39, 0.15)',
+    fontSize: '0.8rem',
+  },
+  connectionLabel: { color: 'rgba(232, 228, 223, 0.6)' },
+  connectionStat: { color: 'rgba(232, 228, 223, 0.85)' },
+  connectionError: { color: '#c75c5c' },
+  section: {
+    padding: '3rem 2rem',
+    maxWidth: 1200,
     margin: '0 auto',
   },
-  wrapper: {},
-  title: { fontSize: '1.5rem', marginBottom: '0.25rem' },
-  h2: { fontSize: '1.1rem', marginTop: 0, marginBottom: '0.75rem' },
-  card: {
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    padding: '1rem 1.25rem',
-    marginBottom: '1rem',
+  sectionTitle: {
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontSize: '1.5rem',
+    fontWeight: 400,
+    color: '#e8e4df',
+    margin: '0 0 1.5rem',
+    letterSpacing: '0.04em',
   },
-  muted: { color: 'var(--muted)', fontSize: '0.9rem' },
-  countList: { margin: '0.5rem 0 0', paddingLeft: '1.25rem' },
-  grid: {
+  sectionLink: { marginTop: '1rem', marginBottom: 0 },
+  link: { color: '#c9a227', textDecoration: 'none' },
+  muted: { color: 'rgba(232, 228, 223, 0.5)', fontSize: '0.9rem' },
+  errorText: { color: '#c75c5c', fontSize: '0.9rem' },
+  newsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-    gap: '1rem',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: '1.5rem',
   },
-  tile: {
-    border: '1px solid var(--border)',
-    borderRadius: 6,
-    overflow: 'hidden',
-    fontSize: '0.9rem',
-  },
-  thumb: {
+  newsCard: {
+    display: 'block',
     width: '100%',
-    height: 100,
+    textAlign: 'left',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(201, 162, 39, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    cursor: 'pointer',
+    padding: 0,
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  },
+  newsThumb: {
+    width: '100%',
+    height: 160,
     objectFit: 'cover',
     display: 'block',
-    background: 'var(--border)',
+    background: 'rgba(0,0,0,0.3)',
   },
-  footer: { marginTop: '2rem', fontSize: '0.85rem', color: 'var(--muted)' },
+  newsCardBody: { padding: '1rem' },
+  newsCardTitle: {
+    display: 'block',
+    fontSize: '1rem',
+    color: '#e8e4df',
+    marginBottom: '0.35rem',
+  },
+  newsCardDate: { fontSize: '0.8rem', color: 'rgba(232, 228, 223, 0.5)' },
+  productGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gap: '1.5rem',
+  },
+  productCard: {
+    display: 'block',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(201, 162, 39, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    textDecoration: 'none',
+    color: 'inherit',
+    transition: 'border-color 0.2s',
+  },
+  productThumb: {
+    width: '100%',
+    height: 220,
+    objectFit: 'cover',
+    display: 'block',
+    background: 'rgba(0,0,0,0.3)',
+  },
+  productCardBody: { padding: '1rem' },
+  productCardName: { display: 'block', fontSize: '1rem', marginBottom: '0.25rem' },
+  productCardPrice: { fontSize: '0.9rem', color: '#c9a227' },
+  eventGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+    gap: '1.5rem',
+  },
+  eventCard: {
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(201, 162, 39, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  eventThumb: {
+    width: '100%',
+    height: 140,
+    objectFit: 'cover',
+    display: 'block',
+    background: 'rgba(0,0,0,0.3)',
+  },
+  eventCardBody: { padding: '1rem' },
+  eventCardTitle: { display: 'block', fontSize: '1rem', marginBottom: '0.25rem' },
+  eventCardDate: { fontSize: '0.8rem', color: 'rgba(232, 228, 223, 0.5)' },
+  footer: {
+    padding: '2rem',
+    textAlign: 'center',
+    borderTop: '1px solid rgba(201, 162, 39, 0.2)',
+    fontSize: '0.85rem',
+  },
+  footerLink: { color: '#c9a227', textDecoration: 'none' },
+  footerMuted: { color: 'rgba(232, 228, 223, 0.45)' },
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.85)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '2rem',
+    overflow: 'auto',
+  },
+  modal: {
+    position: 'relative',
+    background: '#141414',
+    border: '1px solid rgba(201, 162, 39, 0.3)',
+    borderRadius: 8,
+    maxWidth: 560,
+    width: '100%',
+    maxHeight: '90vh',
+    overflow: 'auto',
+    padding: '2rem',
+  },
+  modalClose: {
+    position: 'absolute',
+    top: '1rem',
+    right: '1rem',
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    border: '1px solid rgba(232,228,223,0.3)',
+    background: 'transparent',
+    color: '#e8e4df',
+    fontSize: '1.5rem',
+    lineHeight: 1,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+  },
+  modalLoading: { color: 'rgba(232,228,223,0.6)' },
+  modalImage: {
+    width: '100%',
+    maxHeight: 280,
+    objectFit: 'cover',
+    borderRadius: 4,
+    marginBottom: '1.25rem',
+    display: 'block',
+  },
+  modalTitle: {
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontSize: '1.35rem',
+    fontWeight: 400,
+    margin: '0 0 0.5rem',
+    color: '#e8e4df',
+  },
+  modalDate: { fontSize: '0.85rem', color: 'rgba(232,228,223,0.5)', margin: '0 0 1rem' },
+  modalContent: {
+    fontSize: '0.95rem',
+    lineHeight: 1.6,
+    color: 'rgba(232,228,223,0.9)',
+    whiteSpace: 'pre-wrap',
+  },
 };
