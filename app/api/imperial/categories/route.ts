@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
+import { productsHasCategoryIdColumn } from '@/lib/imperial-products-schema';
 
 const pool = process.env.DATABASE_URL_IMPERIAL
   ? new Pool({ connectionString: process.env.DATABASE_URL_IMPERIAL })
@@ -18,6 +19,9 @@ export async function GET() {
     );
   }
   try {
+    if (!(await productsHasCategoryIdColumn(pool))) {
+      return NextResponse.json([]);
+    }
     const { rows } = await pool.query(
       `SELECT DISTINCT category_id AS id FROM public.products WHERE category_id IS NOT NULL ORDER BY category_id`
     );
@@ -25,6 +29,10 @@ export async function GET() {
       (rows as { id: number }[]).map((r) => ({ id: r.id, name: `Category ${r.id}` }))
     );
   } catch (e) {
+    const err = e as { code?: string; message?: string };
+    if (err.code === '42703' || /category_id/i.test(String(err.message))) {
+      return NextResponse.json([]);
+    }
     console.error(e);
     return NextResponse.json(
       { error: 'Database error', details: String((e as Error).message) },

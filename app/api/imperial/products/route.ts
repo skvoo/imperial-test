@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { rewriteImperialProductImages } from '@/lib/imperial-storage-url';
+import { productsHasCategoryIdColumn } from '@/lib/imperial-products-schema';
 
 const pool = process.env.DATABASE_URL_IMPERIAL
   ? new Pool({ connectionString: process.env.DATABASE_URL_IMPERIAL })
@@ -44,6 +45,8 @@ export async function GET(req: Request) {
   const usePagination = searchParams.has('page') || searchParams.has('per_page');
 
   try {
+    const hasCategoryCol = await productsHasCategoryIdColumn(pool);
+
     let where = '1=1';
     const params: (string | number)[] = [];
     let idx = 1;
@@ -53,7 +56,12 @@ export async function GET(req: Request) {
       params.push(`%${search}%`);
       idx++;
     }
-    if (categoryId !== null && categoryId !== '' && !Number.isNaN(Number(categoryId))) {
+    if (
+      hasCategoryCol &&
+      categoryId !== null &&
+      categoryId !== '' &&
+      !Number.isNaN(Number(categoryId))
+    ) {
       where += ` AND p.category_id = $${idx}`;
       params.push(Number(categoryId));
       idx++;
